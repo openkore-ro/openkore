@@ -1,4 +1,43 @@
 ==================
+### 1.6.4
+==================
+
+Bug fixes:
+- Fixed mRO support.
+- Fixed iRO Sakray support.
+
+
+==================
+### 1.6.3
+==================
+
+New features:
+- Support for baby classes! Kore will now be able to identify these
+  classes correctly.
+- Storage kafra password. See storageAuto_password below.
+- Ability to evade Freya's anti-bot system.
+- Support for eAthena servers using sakexe628. Use serverType 5 for these.
+
+Bug fixes:
+- Vending zeny limit is no longer limited to 10 million.
+
+New config options:
+- storageAuto_password (number)
+  If your server is using a storage password, put the password here.
+  You must also set storageEncryptKey!
+
+- storageEncryptKey (key)
+  Put your server's encryption key here. For mRO, it is:
+  0x050B6F79, 0x0202C179, 0x00E20120, 0x04FA43E3, 0x0179B6C8, 0x05973DF2, 0x07D8D6B, 0x08CB9ED9
+
+  The key may change in the future.
+
+Credits:
+- Harry: Perl implementation of the Crypton encyrption algorithm.
+- dorky, BoNeS, piroJOKE: help in serverType 5 support
+
+
+==================
 ### 1.6.2
 ==================
 
@@ -287,7 +326,7 @@ Credits:
 - TJ09: Einbroch fields.
 - kaliwanagan: 'selfSkill' domain.
 - bijikucing: Ayothaya portals.
-- Ω√¿Ã∂Û: Juperos and Lighthalzen fields.
+- ÏãúÏù¥Îùº: Juperos and Lighthalzen fields.
 
 
 ==================
@@ -1720,6 +1759,7 @@ Minor tweaks:
 
 Known bugs (will be fixed later):
 - equipAuto_#_skill doesn't seem to work at all.
+
 
 ==================
 ### 1.3.0 (beta)

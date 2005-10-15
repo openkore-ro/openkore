@@ -28,6 +28,7 @@ use Commands;
 use Misc;
 use Plugins;
 use Utils;
+use Utils::Crypton;
 
 
 # use SelfLoader; 1;
@@ -192,6 +193,9 @@ sub checkConnection {
 		}
 		if ($master->{chatLangCode} ne '' && $config{chatLangCode} != $master->{chatLangCode}) {
 			configModify('chatLangCode', $master->{chatLangCode});
+		}
+		if ($master->{storageEncryptKey} ne '' && $config{storageEncryptKey} != $master->{storageEncryptKey}) {
+			configModify('storageEncryptKey', $master->{storageEncryptKey});
 		}
 
 		message("Connecting to Master Server...\n", "connection");
@@ -654,7 +658,7 @@ sub AI {
 		while (@unknownObjects) {
 			my $ID = $unknownObjects[0];
 			my $object = $players{$ID} || $npcs{$ID};
-			if (!$object || $object->{gotName}) {
+			if (!$object || $object->{gotName} || $object->{statuses}{"GM Perfect Hide"}) {
 				shift @unknownObjects;
 				next;
 			}
@@ -670,7 +674,7 @@ sub AI {
 			}
 		}
 		foreach (keys %pets) { 
-			if ($pets{$_}{'name_given'} =~ /Unknown/) { 
+			if ($pets{$_}{'name_given'} =~ /Unknown/ && !$pets{$_}{statuses}{"GM Perfect Hide"}) { 
 				sendGetPlayerInfo(\$remote_socket, $_); 
 				last; 
 			}
@@ -3324,7 +3328,6 @@ sub AI {
 			my $portalDist = $config{'attackMinPortalDistance'} || 4;
 			my $playerDist = $config{'attackMinPlayerDistance'};
 			$playerDist = 1 if ($playerDist < 1);
-			eval $OpenKoreMod::autoAttack if defined($OpenKoreMod::autoAttack);
 
 			# Detect whether we are currently in follow mode
 			my $following;
@@ -4903,7 +4906,7 @@ sub parseMsg {
 	} elsif ($switch eq "0077") {
 		$conState = 5 if ($conState != 4 && $xkore);
 
-	} elsif ($switch eq "0078" || $switch eq "01D8") {
+	} elsif ($switch eq "0078" || $switch eq "01D8" || $switch eq "022C") {
 		# 0078: long ID, word speed, word state, word ailment, word look, word
 		# class, word hair, word weapon, word head_option_bottom, word shield,
 		# word head_option_top, word head_option_mid, word hair_color, word ?,
@@ -4911,28 +4914,48 @@ sub parseMsg {
 		# sex, 3byte coord, byte body_dir, byte ?, byte ?, byte sitting, word
 		# level
 		$conState = 5 if ($conState != 4 && $xkore);
-		my $ID = substr($msg, 2, 4);
-		my $walk_speed = unpack("S", substr($msg, 6, 2)) / 1000;
-                my $param1 = unpack("S1", substr($msg, 8, 2));
-                my $param2 = unpack("S1", substr($msg, 10, 2));
-                my $param3 = unpack("S1", substr($msg, 12, 2));
-		my $type = unpack("S*",substr($msg, 14,  2));
-		my $pet = unpack("C*",substr($msg, 16,  1));
-		my $weapon = unpack("S1", substr($msg, 18, 2));
-		my $shield = unpack("S1", substr($msg, $switch eq "01D8" ? 20 : 22, 2));
-		my $lowhead = unpack("S1", substr($msg, $switch eq "01D8" ? 22 : 20,  2));
-		my $tophead = unpack("S1", substr($msg, 24, 2));
-		my $midhead = unpack("S1", substr($msg, 26, 2));
-		my $hair_color = unpack("S1", substr($msg, 28, 2));
-		my $head_dir = unpack("S", substr($msg, 32, 2)) % 8;
-		my $guildID = unpack("L1", substr($msg, 34, 4));
-		my $sex = unpack("C*",substr($msg, 45,  1));
-		my %coords;
-		makeCoords(\%coords, substr($msg, 46, 3));
-		my $body_dir = unpack("C", substr($msg, 48, 1)) % 8;
-		my $act = unpack("C*",substr($msg, 51,  1));
-		my $lv = unpack("S*",substr($msg, 52,  2));
-		my $added;
+		my ($ID, $walk_speed, $param1, $param2, $param3, $type, $pet,
+			$weapon, $shield, $lowhead, $tophead, $midhead, $hair_color,
+			$head_dir, $guildID, $sex, %coords, $body_dir, $act, $lv, $added);
+
+		$ID = substr($msg, 2, 4);
+		$walk_speed = unpack("S", substr($msg, 6, 2)) / 1000;
+                $param1 = unpack("S1", substr($msg, 8, 2));
+                $param2 = unpack("S1", substr($msg, 10, 2));
+                $param3 = unpack("S1", substr($msg, 12, 2));
+
+		if ($switch eq "022C") {
+			$type = unpack("S*",substr($msg, 16,  2));
+			$pet = unpack("C*",substr($msg, 18,  1));
+			$weapon = unpack("S1", substr($msg, 20, 2));
+			$shield = unpack("S1", substr($msg, 22, 2));
+			$lowhead = unpack("S1", substr($msg, 24, 2));
+			$tophead = unpack("S1", substr($msg, 30, 2));
+			$midhead = unpack("S1", substr($msg, 32, 2));
+			$hair_color = unpack("S1", substr($msg, 26, 2));
+			$head_dir = unpack("S", substr($msg, 34, 2)) % 8;
+			$guildID = unpack("L1", substr($msg, 36, 4));
+			$sex = unpack("C*",substr($msg, 55, 1));
+			makeCoords2(\%coords, substr($msg, 56, 3));
+			$act = unpack("C*",substr($msg, 61, 1));
+			$lv = unpack("S*",substr($msg, 62, 2));
+		} else {
+			$type = unpack("S*",substr($msg, 14,  2));
+			$pet = unpack("C*",substr($msg, 16,  1));
+			$weapon = unpack("S1", substr($msg, 18, 2));
+			$shield = unpack("S1", substr($msg, $switch eq "01D8" ? 20 : 22, 2));
+			$lowhead = unpack("S1", substr($msg, $switch eq "01D8" ? 22 : 20,  2));
+			$tophead = unpack("S1", substr($msg, 24, 2));
+			$midhead = unpack("S1", substr($msg, 26, 2));
+			$hair_color = unpack("S1", substr($msg, 28, 2));
+			$head_dir = unpack("S", substr($msg, 32, 2)) % 8;
+			$guildID = unpack("L1", substr($msg, 34, 4));
+			$sex = unpack("C*",substr($msg, 45,  1));
+			makeCoords(\%coords, substr($msg, 46, 3));
+			$body_dir = unpack("C", substr($msg, 48, 1)) % 8;
+			$act = unpack("C*",substr($msg, 51,  1));
+			$lv = unpack("S*",substr($msg, 52,  2));
+		}
 
 		if ($jobs_lut{$type}) {
 			my $player = $players{$ID};
@@ -4968,11 +4991,12 @@ sub parseMsg {
 			$player->{pos_to} = {%coords};
 			my $domain = existsInList($config{friendlyAID}, unpack("L1", $player->{ID})) ? 'parseMsg_presence' : 'parseMsg_presence/player';
 			debug "Player Exists: ".$player->name." ($player->{binID}) Level $lv $sex_lut{$player->{sex}} $jobs_lut{$player->{jobID}}\n", $domain, 1;
-			setStatus($ID,$param1,$param2,$param3);
 
 			objectAdded('player', $ID, $player) if ($added);
 
 			Plugins::callHook('player', {player => $player});
+
+			setStatus($ID,$param1,$param2,$param3);
 
 		} elsif ($type >= 1000) {
 			if ($pet) {
@@ -5021,12 +5045,12 @@ sub parseMsg {
 
 				debug "Monster Exists: $monsters{$ID}{'name'} ($monsters{$ID}{'binID'})\n", "parseMsg_presence", 1;
 
+				objectAdded('monster', $ID, $monsters{$ID}) if ($added);
 
 				# Monster state
 				$param1 = 0 if $param1 == 5; # 5 has got something to do with the monster being undead
 				setStatus($ID,$param1,$param2,$param3);
 
-				objectAdded('monster', $ID, $monsters{$ID}) if ($added);
 			}
 
 		} elsif ($type == 45) {
@@ -5066,29 +5090,47 @@ sub parseMsg {
 
 			objectAdded('npc', $ID, $npcs{$ID}) if ($added);
 
+			setStatus($ID, $param1, $param2, $param3);
+
 		} else {
 			debug "Unknown Exists: $type - ".unpack("L*",$ID)."\n", "parseMsg";
 		}
 
-	} elsif ($switch eq "0079" || $switch eq "01D9") {
+	} elsif ($switch eq "0079" || $switch eq "01D9" || $switch eq "022B") {
 		$conState = 5 if ($conState != 4 && $xkore);
-		my $ID = substr($msg, 2, 4);
-		my $walk_speed = unpack("S", substr($msg, 6, 2)) / 1000;
-		my $param1 = unpack("S1", substr($msg, 8, 2));
-		my $param2 = unpack("S1", substr($msg, 10, 2));
-		my $param3 = unpack("S1", substr($msg, 12, 2));
-		my $type = unpack("S*", substr($msg, 14,  2));
-		my $weapon = unpack("S1", substr($msg, 18, 2));
-		my $shield = unpack("S1", substr($msg, $switch eq "01D9" ? 20 : 22, 2));
-		my $lowhead = unpack("S1", substr($msg, $switch eq "01D9" ? 22 : 20,  2));
-		my $tophead = unpack("S1", substr($msg, 24,  2));
-		my $midhead = unpack("S1", substr($msg, 26,  2));
-		my $hair_color = unpack("S1", substr($msg, 28, 2));
-		my $sex = unpack("C*", substr($msg, 45,  1));
-		my $guildID = unpack("L1", substr($msg, 34, 4));
-		my %coords;
-		makeCoords(\%coords, substr($msg, 46, 3));
-		my $lv = unpack("S*", substr($msg, 51,  2));
+		my ($ID, $walk_speed, $param1, $param2, $param3, $type, $weapon, $shield,
+			$lowhead, $tophead, $midhead, $hair_color, $sex, $guildID, %coords, $lv);
+
+		$ID = substr($msg, 2, 4);
+		$walk_speed = unpack("S", substr($msg, 6, 2)) / 1000;
+		$param1 = unpack("S1", substr($msg, 8, 2));
+		$param2 = unpack("S1", substr($msg, 10, 2));
+		$param3 = unpack("S1", substr($msg, 12, 2));
+		if ($switch eq "022B") {
+			$type = unpack("S1", substr($msg, 16,  2));
+			$weapon = unpack("S1", substr($msg, 20, 2));
+			$shield = unpack("S1", substr($msg, 22, 2));
+			$lowhead = unpack("S1", substr($msg, 24, 2));
+			$tophead = unpack("S1", substr($msg, 30, 2));
+			$midhead = unpack("S1", substr($msg, 32, 2));
+			$hair_color = unpack("S1", substr($msg, 26, 2));
+			$sex = unpack("C*", substr($msg, 49, 1));
+			$guildID = unpack("L1", substr($msg, 36, 4));
+			makeCoords(\%coords, substr($msg, 50, 3));
+			$lv = unpack("S*", substr($msg, 55, 2));
+		} else {
+			$type = unpack("S*", substr($msg, 14,  2));
+			$weapon = unpack("S1", substr($msg, 18, 2));
+			$shield = unpack("S1", substr($msg, $switch eq "01D9" ? 20 : 22, 2));
+			$lowhead = unpack("S1", substr($msg, $switch eq "01D9" ? 22 : 20,  2));
+			$tophead = unpack("S1", substr($msg, 24,  2));
+			$midhead = unpack("S1", substr($msg, 26,  2));
+			$hair_color = unpack("S1", substr($msg, 28, 2));
+			$sex = unpack("C*", substr($msg, 45,  1));
+			$guildID = unpack("L1", substr($msg, 34, 4));
+			makeCoords(\%coords, substr($msg, 46, 3));
+			$lv = unpack("S*", substr($msg, 51,  2));
+		}
 
 		if ($jobs_lut{$type}) {
 			my $added;
@@ -5119,9 +5161,10 @@ sub parseMsg {
 			$players{$ID}{pos_to} = {%coords};
 			my $domain = existsInList($config{friendlyAID}, unpack("L1", $ID)) ? 'parseMsg_presence' : 'parseMsg_presence/player';
 			debug "Player Connected: ".$players{$ID}->name." ($players{$ID}{'binID'}) Level $lv $sex_lut{$players{$ID}{'sex'}} $jobs_lut{$players{$ID}{'jobID'}}\n", $domain;
-			setStatus($ID, $param1, $param2, $param3);
 
 			objectAdded('player', $ID, $players{$ID}) if ($added);
+
+			setStatus($ID, $param1, $param2, $param3);
 
 		} else {
 			debug "Unknown Connected: $type - ", "parseMsg";
@@ -5189,9 +5232,10 @@ sub parseMsg {
 			$players{$ID}{time_move} = time;
 			$players{$ID}{time_move_calc} = distance(\%coordsFrom, \%coordsTo) * $walk_speed;
 			debug "Player Moved: $players{$ID}{'name'} ($players{$ID}{'binID'}) $sex_lut{$players{$ID}{'sex'}} $jobs_lut{$players{$ID}{'jobID'}}\n", "parseMsg";
-                        setStatus($ID, $param1, $param2, $param3);
 
 			objectAdded('player', $ID, $players{$ID}) if ($added);
+
+                        setStatus($ID, $param1, $param2, $param3);
 
 		} elsif ($type >= 1000) {
 			if ($pet) {
@@ -5245,23 +5289,37 @@ sub parseMsg {
 				$monsters{$ID}{time_move_calc} = distance(\%coordsFrom, \%coordsTo) * $walk_speed;
 				$monsters{$ID}{walk_speed} = $walk_speed;
 				debug "Monster Moved: $monsters{$ID}{'name'} ($monsters{$ID}{'binID'})\n", "parseMsg", 2;
-	                        setStatus($ID, $param1, $param2, $param3);
 
 				objectAdded('monster', $ID, $monsters{$ID}) if ($added);
+
+	                        setStatus($ID, $param1, $param2, $param3);
 			}
 		} else {
 			debug "Unknown Moved: $type - ".getHex($ID)."\n", "parseMsg";
 		}
 
-	} elsif ($switch eq "007C") {
+	} elsif ($switch eq "007C" || $switch eq "022A") {
 		$conState = 5 if ($conState != 4 && $xkore);
-		my $ID = substr($msg, 2, 4);
-		my %coords;
-		makeCoords(\%coords, substr($msg, 36, 3));
-		my $type = unpack("S*",substr($msg, 20,  2));
-		my $pet = unpack("C*",substr($msg, 22,  1));
-		my $sex = unpack("C*",substr($msg, 35,  1));
-		my $added;
+		my ($ID, $param1, $param2, $param3, $type, $pet, $sex, $added, %coords);
+		if ($switch eq "007C") {
+			$ID = substr($msg, 2, 4);
+			$param1 = unpack("S1", substr($msg,  8, 2));
+			$param2 = unpack("S1", substr($msg, 10, 2));
+			$param3 = unpack("S1", substr($msg, 12, 2));
+			makeCoords(\%coords, substr($msg, 36, 3));
+			$type = unpack("S*",substr($msg, 20,  2));
+			$pet = unpack("C*",substr($msg, 22,  1));
+			$sex = unpack("C*",substr($msg, 35,  1));
+		} else {
+			$ID = substr($msg, 2, 4);
+			$param1 = unpack("v1", substr($msg, 8, 2));
+			$param2 = unpack("v1", substr($msg, 10, 2));
+			$param3 = unpack("v1", substr($msg, 12, 2));
+			makeCoords(\%coords, substr($msg, 50, 3));
+			$type = unpack("v1", substr($msg, 16, 2));
+			$pet = unpack("v1", substr($msg, 18, 2));
+			$sex = unpack("C1", substr($msg, 49, 1));
+		}
 
 		if ($jobs_lut{$type}) {
 			if (!UNIVERSAL::isa($players{$ID}, 'Actor')) {
@@ -5282,6 +5340,8 @@ sub parseMsg {
 			debug "Player Spawned: ".$players{$ID}->name." ($players{$ID}{'binID'}) $sex_lut{$players{$ID}{'sex'}} $jobs_lut{$players{$ID}{'jobID'}}\n", "parseMsg";
 
 			objectAdded('player', $ID, $players{$ID}) if ($added);
+
+			setStatus($ID, $param1, $param2, $param3);
 
 		} elsif ($type >= 1000) {
 			if ($pet) {
@@ -5329,6 +5389,8 @@ sub parseMsg {
 				debug "Monster Spawned: $monsters{$ID}{'name'} ($monsters{$ID}{'binID'})\n", "parseMsg_presence";
 
 				objectAdded('monster', $ID, $monsters{$ID}) if ($added);
+
+				setStatus($ID, $param1, $param2, $param3);
 			}
 
 		} else {
@@ -7378,7 +7440,7 @@ sub parseMsg {
 		});
 
 
-	} elsif ($switch eq "0119") {
+	} elsif ($switch eq "0119" || $switch eq "0229") {
 		# Character looks
 		my $ID = substr($msg, 2, 4);
 		my $param1 = unpack("S1", substr($msg, 6, 2));
@@ -8672,6 +8734,60 @@ sub parseMsg {
 		} else {
 			error "Buy failed (failure code $fail).\n";
 		}
+
+	} elsif ($switch eq '023A') {
+		my $flag = unpack("v1", substr($msg, 2, 2));
+		if ($flag == 0) {
+			message "Please enter a new storage password:\n";
+		} elsif ($flag == 1) {
+
+			while ($config{storageAuto_password} eq '' && !$quit) {
+				message "Please enter your storage password:\n";
+				my $input = $interface->getInput(-1);
+				if ($input ne '') {
+					configModify('storageAuto_password', $input, 1);
+					message "Storage password set to: $input\n", "success";
+					last;
+				}
+			}
+			return if ($quit);
+
+			#my @key = $config{storageEncryptKey} =~ /(.+)[, ]+(.+)[, ]+(.+)[, ]+(.+)[, ]+(.+)[, ]+(.+)[, ]+(.+)[, ]+(.+)/;
+			my @key = split /[, ]+/, $config{storageEncryptKey};
+			if (!@key) {
+				# Default key for mRO and pRO
+				@key = ('0x050B6F79', '0x0202C179', '0x00E20120', '0x04FA43E3', '0x0179B6C8', '0x05973DF2', '0x07D8D6B', '0x08CB9ED9');
+				#error "Unable to send storage password. You must set the 'storageEncryptKey' option in config.txt or servers.txt.\n";
+				#return;
+			}
+
+			my $crypton = new Utils::Crypton(pack("V*", @key), 32);
+			my $num = $config{storageAuto_password};
+			$num = sprintf("%d%08d", length($num), $num);
+			my $ciphertextBlock = $crypton->encrypt(pack("V*", $num, 0, 0, 0));
+			sendStoragePassword($ciphertextBlock, 3);
+
+		} else {
+			message "Storage password: unknown flag $flag\n";
+		}
+
+	} elsif ($switch eq '023C') {
+		my $type = unpack("v1", substr($msg, 2, 2));
+		my $val = unpack("v1", substr($msg, 4, 2));
+
+		if ($type == 4) {
+			message "Successfully changed storage password.\n", "success";
+		} elsif ($type == 5) {
+			error "Error: Incorrect storage password.\n";
+		} elsif ($type == 6) {
+			message "Successfully entered storage password.\n", "success";
+		} else {
+			message "Storage password: unknown type $args->{type}\n";
+		}
+
+		# $args->{val}
+		# unknown, what is this for?
+
 	}
 
 	$msg = (length($msg) >= $msg_size) ? substr($msg, $msg_size, length($msg) - $msg_size) : "";
@@ -9852,6 +9968,7 @@ sub updateDamageTables {
 				$monsters{$ID1}{'missedToParty'}++ if ($damage == 0);
 			}
 			$monsters{$ID1}{target} = $ID2;
+			OpenKoreMod::updateDamageTables($monsters{$ID1}) if (defined &OpenKoreMod::updateDamageTables);
 		}
 		
 	} elsif ($players{$ID1}) {
@@ -9871,6 +9988,7 @@ sub updateDamageTables {
 			    ($chars[$config{'char'}]{'party'} && %{$chars[$config{'char'}]{'party'}} && $chars[$config{'char'}]{'party'}{'users'}{$ID1} && %{$chars[$config{'char'}]{'party'}{'users'}{$ID1}})) {
 				$monsters{$ID2}{'dmgFromParty'} += $damage;
 			}
+			OpenKoreMod::updateDamageTables($monsters{$ID2}) if (defined &OpenKoreMod::updateDamageTables);
 		}
 	}
 }
@@ -10786,6 +10904,29 @@ sub setStatus {
 			delete $actor->{statuses}{$skillsLooks{$_}};
 			debug "$name $are out of look: $skillsLooks{$_}\n", "parseMsg_statuslook", $verbosity;
 		}
+	}
+
+	# remove perfectly hidden objects
+	if ($actor->{statuses}{'GM Perfect Hide'}) {
+		if ($players{$ID}) {
+			message "Remove perfectly hidden $actor\n";
+			binRemove(\@playersID, $ID);
+			objectRemoved('player', $ID, $players{$ID});
+			delete $players{$ID};
+		}
+		if ($monsters{$ID}) {
+			message "Remove perfectly hidden $actor\n";
+			binRemove(\@monstersID, $ID);
+			objectRemoved('monster', $ID, $monsters{$ID});
+			delete $monsters{$ID};
+		}
+		# NPCs do this on purpose (who knows why)
+		#if ($npcs{$ID}) {
+		#	message "Remove perfectly hidden $actor\n";
+		#	binRemove(\@npcsID, $ID);
+		#	objectRemoved('npc', $ID, $npcs{$ID});
+		#	delete $npcs{$ID};
+		#}
 	}
 }
 
