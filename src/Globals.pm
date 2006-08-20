@@ -30,7 +30,7 @@ our %EXPORT_TAGS = (
 	state   => [qw($accountID $cardMergeIndex @cardMergeItemsID $charID @chars @chars_old %cart @friendsID %friends %incomingFriend %field @itemsID %items @monstersID %monsters @npcsID %npcs @playersID %players @portalsID @portalsID_old %portals %portals_old @storeList $currentChatRoom @currentChatRoomUsers @chatRoomsID %createdChatRoom %chatRooms @skillsID %storage @storageID @arrowCraftID %guild %incomingGuild @spellsID %spells @unknownObjects $statChanged $skillChanged $useArrowCraft %currentDeal %incomingDeal %outgoingDeal @identifyID @partyUsersID %incomingParty @petsID %pets @venderItemList $venderID @venderListsID @articles $articles %venderLists %monsters_old @monstersID_old %npcs_old %items_old %players_old @playersID_old @servers $sessionID $sessionID2 $accountSex $accountSex2 $map_ip $map_port $KoreStartTime $waitingForInput $secureLoginKey $initSync $lastConfChangeTime)],
 	network => [qw($remote_socket $charServer $conState $conState_tries $encryptVal $ipc $lastPacketTime $masterServer $xkore $msg $lastswitch)],
 	interface => [qw($interface)],
-	misc    => [qw($buildType $quit @lastpm %lastpm @privMsgUsers %timeout_ex $shopstarted $dmgpsec $totalelasped $elasped $totaldmg %overallAuth %responseVars %talk $startTime_EXP $startingZenny @monsters_Killed $bExpSwitch $jExpSwitch $totalBaseExp $totalJobExp $shopEarned %itemChange %checkUpdate $XKore_dontRedirect $monkilltime $monstarttime $startedattack $firstLoginMap $sentWelcomeMessage $versionSearch %guildNameRequest $monsterBaseExp $monsterJobExp $lastPartyOrganizeName)],
+	misc    => [qw($buildType $quit @lastpm %lastpm @privMsgUsers %timeout_ex $shopstarted $dmgpsec $totalelasped $elasped $totaldmg %overallAuth %responseVars %talk $startTime_EXP $startingZenny @monsters_Killed $bExpSwitch $jExpSwitch $totalBaseExp $totalJobExp $shopEarned %itemChange %checkUpdate $XKore_dontRedirect $monkilltime $monstarttime $startedattack $firstLoginMap $sentWelcomeMessage $versionSearch %guildNameRequest $monsterBaseExp $monsterJobExp $lastPartyOrganizeName $userSeed)],
 );
 
 our @EXPORT = (
@@ -182,7 +182,28 @@ our %jobs_lut = (
 	4042 => 'Baby Bard',
 	4043 => 'Baby Dancer',
 	4044 => 'Baby Peco Crusader',
-	4045 => 'Super Baby' # or Baby Super Novice, I like the way eAthena calls it though
+	4045 => 'Super Baby', # or Baby Super Novice, I like the way eAthena calls it though
+	4046 => 'Taekwon',
+	4047 => 'Star Gladiator',
+	4048 => 'Flying Star Gladiator',
+	4049 => 'Soul Linker',
+
+	6001 => 'Lif',
+	6002 => 'Amistr',
+	6003 => 'Filir',
+	6004 => 'Vanilmirth',
+	6005 => 'Lif 2',
+	6006 => 'Amistr 2',
+	6007 => 'Filir 2',
+	6008 => 'Vanilmirth 2',
+	6009 => 'High Lif',
+	6010 => 'High Amistr',
+	6011 => 'High Filir',
+	6012 => 'High Vanilmirth',
+	6013 => 'High Lif 2',
+	6014 => 'High Amistr 2',
+	6015 => 'High Filir 2',
+	6016 => 'High Vanilmirth 2'
 );
 
 # AI
@@ -316,6 +337,7 @@ our %guildNameRequest;
 our $monsterBaseExp;
 our $monsterJobExp;
 our $lastPartyOrganizeName;
+our $userSeed;
 
 
 # Detect operating system
